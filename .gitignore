@@ -1,0 +1,8 @@
+# Rust build artifacts (carry itself)
+/target
+
+# Editor noise
+*.swp
+*~
+.idea/
+.vscode/
