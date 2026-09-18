@@ -6,6 +6,7 @@
 - **Blockers:** none
 - **Baseline checks (2026-09-18, current checkout):** `cargo build` ✅ zero warnings · `cargo clippy --all-targets` ✅ zero warnings · `cargo test` ✅ 0 tests, harness runs
 - **Environment:** cargo 1.98.1 · cmake 4.4.3 · conan 2.32.0 · g++ 16.2.1 · ninja 1.13.2 · Conan default profile present · Conan Center network access unverified (T007)
+- **Git:** no global/system git identity on this machine; repo-local identity set to `carry-dev <carry-dev@local>` (matches T000 author). End each task with a local commit, one per task.
 - **Deps so far:** clap 4.6.7 (derive), anyhow 1.0.104. T002 adds serde/toml/toml_edit via `cargo add`.
 
 ## Resume instructions
