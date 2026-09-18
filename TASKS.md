@@ -7,7 +7,7 @@ result in `results/Txxx.md`. **Next task = first `pending` row in order.**
 | ID  | Task | Status  | Result |
 |-----|------|---------|--------|
 | T000 | Bootstrap: repo-as-memory system, design, plan | done | results/T000.md |
-| T001 | Rust CLI scaffold: clap, command stubs, error plumbing | pending | — |
+| T001 | Rust CLI scaffold: clap, command stubs, error plumbing | done | results/T001.md |
 | T002 | Manifest (CARRY.toml) + `carry new` / `carry init` | pending | — |
 | T003 | Generator: manifest → conanfile.txt + CMakeLists.txt | pending | — |
 | T004 | Build pipeline: conan → cmake → ninja (`carry build`) | pending | — |

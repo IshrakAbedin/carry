@@ -1,13 +1,15 @@
-# STATE — last updated 2026-09-17 (after T000)
+# STATE — last updated 2026-09-18 (after T001)
 
-- **Current task:** T001 — Rust CLI scaffold (pending, not started)
-- **Last completed:** T000 — bootstrap: repo-as-memory, design, plan
-- **One-line state:** Repo bootstrapped; DESIGN.md and task breakdown T001–T008 in place; no application code yet.
+- **Current task:** T002 — Manifest (CARRY.toml) + `carry new` / `carry init` (pending, not started)
+- **Last completed:** T001 — Rust CLI scaffold: clap CLI with all 8 subcommands, stubs, error plumbing
+- **One-line state:** Crate builds clean at repo root; every subcommand is a stub printing "not implemented (planned in T0xx)"; next is the manifest + scaffolding.
 - **Blockers:** none
-- **Baseline checks:** none yet (no Cargo.toml). From T001 on, this line must state the result of `cargo build` / `cargo test` / `cargo clippy` for the current checkout.
-- **Environment:** cargo 1.98.1 · cmake 4.4.3 · conan 2.32.0 · g++ 16.2.1 · ninja 1.13.2 · Conan default profile present · Conan Center network access unverified
+- **Baseline checks (2026-09-18, current checkout):** `cargo build` ✅ zero warnings · `cargo clippy --all-targets` ✅ zero warnings · `cargo test` ✅ 0 tests, harness runs
+- **Environment:** cargo 1.98.1 · cmake 4.4.3 · conan 2.32.0 · g++ 16.2.1 · ninja 1.13.2 · Conan default profile present · Conan Center network access unverified (T007)
+- **Deps so far:** clap 4.6.7 (derive), anyhow 1.0.104. T002 adds serde/toml/toml_edit via `cargo add`.
 
 ## Resume instructions
 
-Next session: follow BOOTSTRAP.md's protocol and execute **T001** (`tasks/T001-cli-scaffold.md`).
-T001 is self-contained; it depends only on T000 (this bootstrap).
+Next session: follow BOOTSTRAP.md's protocol and execute **T002** (`tasks/T002-manifest-new-init.md` or whatever the T002 file is named under `tasks/`).
+Read `results/T001.md` (hints section) before starting: module-allow locations, stderr error
+convention, and the stub-dispatch seam in `src/main.rs` are all documented there.

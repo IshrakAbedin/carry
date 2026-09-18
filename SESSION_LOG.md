@@ -6,6 +6,21 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-18 — T001: Rust CLI scaffold
+
+- `cargo init` (edition 2024) at repo root; deps `clap 4.6.7` (derive) + `anyhow 1.0.104` only.
+- `src/main.rs`: all 8 MVP subcommands + global `--verbose`; each stub prints
+  `error: <cmd> not implemented yet (planned in T0xx)` to stderr, exit 1.
+- Empty module scaffolds per DESIGN §7 (manifest/template→T002, generate→T003,
+  project/build→T004/T005); `#[allow(dead_code)]` sits on the `mod` lines in main.rs
+  (a bare allow in an empty module file is a syntax error) — remove per module as used.
+- Task-note corrections found: run's trailing args need `#[arg(...)]`, not `#[command(...)]`.
+- Verification: build/clippy zero warnings, test harness runs (0 tests), `--help` shows all
+  8 subcommands, `build` stub exits 1, `--version` → `carry 0.1.0`. See results/T001.md.
+- Next: T002 (manifest + new/init). Conan Center network still unverified (T007).
+
+---
+
 ## 2026-09-17 — T000: bootstrap
 
 - Verified environment: cargo 1.98.1, cmake 4.4.3, conan 2.32.0 (v2, default profile present),
