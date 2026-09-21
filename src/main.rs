@@ -3,8 +3,9 @@
 //! T001: CLI scaffold. T002: `new`/`init` (manifest + scaffold).
 //! T003: generator wired in — `build`/`run`/`test` first locate the project,
 //! load the manifest, and regenerate the generated files (write-if-changed).
-//! T004: `build` runs the real pipeline (conan → cmake → ninja); `run`/`test`
-//! still report "not implemented" until T005 (clean → T005, add/remove → T006).
+//! T004: `build` runs the real pipeline (conan → cmake → ninja).
+//! T005: `run` (build Debug + exec, child exit code propagated), `test`
+//! (build Debug + ctest), `clean` (remove build/). add/remove → T006.
 
 mod build;
 mod generate;
@@ -50,6 +51,9 @@ enum Commands {
     },
 
     /// Build (Debug) then run the project binary with the given arguments
+    #[command(long_about = "Build (Debug), then run the project binary with the given arguments.\n\n\
+        Carry flags must come before user arguments; separate them with `--` when the program \
+        itself takes flags:\n\n    carry run -- --release")]
     Run {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -94,26 +98,20 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             let root = project::find_project_root()?;
             build::build(&root, release, verbose)
         }
-        Commands::Run { .. } => {
-            prepare_project()?;
-            Err(not_implemented("run", "T005"))
+        Commands::Run { args } => {
+            let root = project::find_project_root()?;
+            let manifest = Manifest::load(&root.join(project::MANIFEST_NAME))?;
+            build::run_cmd(&root, &manifest, &args, verbose)
         }
         Commands::Test => {
-            prepare_project()?;
-            Err(not_implemented("test", "T005"))
+            let root = project::find_project_root()?;
+            build::test_cmd(&root, verbose)
         }
-        Commands::Clean => Err(not_implemented("clean", "T005")),
+        Commands::Clean => {
+            let root = project::find_project_root()?;
+            build::clean_cmd(&root)
+        }
         Commands::Add { .. } => Err(not_implemented("add", "T006")),
         Commands::Remove { .. } => Err(not_implemented("remove", "T006")),
     }
-}
-
-/// Shared first step for `build`/`run`/`test` (DESIGN.md §6, steps 1–2):
-/// locate the project root, load the manifest, and regenerate the generated
-/// files (write-if-changed).
-fn prepare_project() -> anyhow::Result<()> {
-    let root = project::find_project_root()?;
-    let manifest = Manifest::load(&root.join(project::MANIFEST_NAME))?;
-    let _ = generate::regenerate(&manifest, &root)?;
-    Ok(())
 }

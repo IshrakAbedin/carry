@@ -11,7 +11,7 @@ result in `results/Txxx.md`. **Next task = first `pending` row in order.**
 | T002 | Manifest (CARRY.toml) + `carry new` / `carry init` | done | results/T002.md |
 | T003 | Generator: manifest → conanfile.txt + CMakeLists.txt | done | results/T003.md |
 | T004 | Build pipeline: conan → cmake → ninja (`carry build`) | done | results/T004.md |
-| T005 | `carry run`, `carry test` (ctest), `carry clean` | pending | — |
+| T005 | `carry run`, `carry test` (ctest), `carry clean` | done | results/T005.md |
 | T006 | `carry add` / `carry remove` (toml_edit, format-preserving) | pending | — |
 | T007 | E2E hardening with a real Conan dependency (fmt) | pending | — |
 | T008 | Polish: README, help text, final verification | pending | — |

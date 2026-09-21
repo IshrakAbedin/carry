@@ -6,6 +6,31 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T005: carry run / test (ctest) / clean
+
+- `build.rs`: `build()` split into public wrapper + private `build_with`
+  (shared manifest load); added `run_cmd` (build Debug → exec
+  `build/bin/<name>`, **child exit code propagated** via
+  `process::exit(code)`, 101 only on signal death, missing binary → carry
+  error), `test_cmd` (build Debug → `ctest --test-dir build
+  --output-on-failure`, failure = carry error exit 1 in T004 format),
+  `clean_cmd` (remove `build/`; "nothing to clean" if absent; refuses a
+  `build` symlink pointing outside the project, inside/broken links removed
+  link-only). `main.rs`: three arms wired, `prepare_project()` deleted,
+  `run` `long_about` documents the `--` separator (carry flags before user
+  args). +4 unit tests (clean, tempfile; symlink cases).
+- Verification: build/clippy zero warnings, **20 unit tests pass**; scratch
+  `runner` (hand-written layout, scaffold untouched): `run hello world` →
+  argc 3 + both args, exit 0; `run -- --release` → `--release` reached the
+  child (not swallowed); `main` returns 3 → carry exit **3**; `test` →
+  "100% tests passed", exit 0; `assert(false)` → on-failure output visible,
+  `error: ctest failed with exit code 8`, exit 1 (reverted); `clean` →
+  `removed build/`, 2nd → `nothing to clean`, rebuild OK. See results/T005.md.
+- No new issues (I001 unchanged). Next: T006 (add/remove on
+  `Manifest::load`/`save`); hints in results/T005.md.
+
+---
+
 ## 2026-09-21 — T004: Build pipeline (conan → cmake → ninja)
 
 - `build.rs`: `run()` (streamed stdout/stderr, verbose `$` line, missing-tool
