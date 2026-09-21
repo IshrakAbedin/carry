@@ -182,6 +182,29 @@ int main() {
 }
 ";
 
+const GLAZE_MAIN_CPP: &str = "\
+#include \"glaze/glaze.hpp\"
+
+#include <iostream>
+#include <string>
+
+struct person {
+  std::string name;
+  int age;
+};
+
+int main() {
+  person p{\"Alice\", 42};
+  std::string json;
+  if (auto ec = glz::write_json(p, json)) {
+    std::cerr << glz::format_error(ec, json) << std::endl;
+    return 1;
+  }
+  std::cout << json << std::endl;
+  return 0;
+}
+";
+
 /// The full loop against real Conan Center (T007 step 2): new → add fmt →
 /// build Debug → run → build Release → test → remove fmt → revert → build.
 /// Needs the C++ toolchain and (first time only) Conan Center network, so it
@@ -252,4 +275,30 @@ fn fmt_full_loop() {
     assert!(!root.join("build").exists());
     let (stdout, _) = carry_ok(&root, &["clean"]);
     assert!(stdout.contains("nothing to clean"), "{stdout}");
+}
+
+/// D12 regression (T009): a dependency whose recipe *validates*
+/// `compiler.cppstd` (glaze/8.3.0 requires C++23) must build even when the
+/// Conan profile's cppstd is older than the manifest's `cpp_std` (this
+/// machine: gnu20 vs c++23). Before D12, `conan install` failed with
+/// "Invalid: Current cppstd (gnu20) is lower than the required C++ standard
+/// (23)"; carry now passes the project's standard to conan.
+#[test]
+#[ignore = "needs C++ toolchain + Conan Center network (D8)"]
+fn glaze_full_loop() {
+    let dir = tempfile::tempdir().unwrap();
+    carry_ok(dir.path(), &["new", "glazeapp"]);
+    let root = dir.path().join("glazeapp");
+
+    std::fs::write(root.join("src/main.cpp"), GLAZE_MAIN_CPP).unwrap();
+
+    // Bare `glaze` — the D11 "any" range; resolves to the highest available
+    // version (8.3.0 at the time of writing, C++23-required).
+    let (stdout, _) = carry_ok(&root, &["add", "glaze"]);
+    assert!(stdout.contains("added glaze"), "{stdout}");
+
+    carry_ok(&root, &["build"]);
+    let (stdout, _) = carry_ok(&root, &["run"]);
+    assert!(stdout.contains(r#""name":"Alice""#), "{stdout}");
+    assert!(stdout.contains(r#""age":42"#), "{stdout}");
 }

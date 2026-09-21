@@ -42,6 +42,15 @@ fn build_with(manifest: &Manifest, root: &Path, release: bool, verbose: bool) ->
             // `-s` takes the setting as a separate argument (not one token).
             "-s",
             &format!("build_type={build_type}"),
+            // Resolve the graph with the project's own standard (D12), not
+            // the profile's cppstd: recipes validate it (glaze/8.3.0
+            // requires C++23) and the profile may be older than what the
+            // generated CMakeLists compiles with (gnu20 vs 23).
+            "-s",
+            &format!(
+                "compiler.cppstd={}",
+                crate::manifest::conan_cppstd(&manifest.build.cpp_std)
+            ),
         ],
         root,
         verbose,

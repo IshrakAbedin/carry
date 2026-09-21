@@ -15,6 +15,8 @@ result in `results/Txxx.md`. **Next task = first `pending` row in order.**
 | T006 | `carry add` / `carry remove` (toml_edit, format-preserving) | done | results/T006.md |
 | T007 | E2E hardening with a real Conan dependency (fmt) | done | results/T007.md |
 | T008 | Polish: README, help text, final verification | done | results/T008.md |
+| T009 | Demo build with glaze; C++ standard sync (D12) | done | results/T009.md |
 
-Order: strictly sequential T001 → T008. Each task file lists its dependencies and what to
-read from earlier results.
+Order: the MVP ran strictly sequential T001 → T008 (frozen at 0.1.0). From T009 on, tasks
+are user-directed/ad-hoc. Each task file lists its dependencies and what to read from
+earlier results.

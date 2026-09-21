@@ -88,6 +88,12 @@ Version mapping to Conan refs:
 - bare `fmt` (no version) → `fmt/[>=0]` — "any version"; a bare `fmt/*` is
   **not** a resolvable require in Conan 2 (D11)
 
+Standard mapping to Conan settings (D12):
+- `cpp_std` `c++23` → `-s compiler.cppstd=gnu23` (GNU dialect for the pinned
+  GCC, D6) — passed to `conan install` so the dependency graph is resolved
+  with the standard the generated CMakeLists compiles with
+- `c_std` — project-local (Conan has no C-std setting)
+
 ## 5. Generated files
 
 ### conanfile.txt (generated)
@@ -137,7 +143,9 @@ Run from the project root (carry walks up from cwd to find `CARRY.toml`; error i
 
 1. Parse `CARRY.toml` → `Manifest` (serde).
 2. Render `conanfile.txt` + `CMakeLists.txt`; write if changed.
-3. `conan install . --output-folder=build --build=missing -s build_type=<Debug|Release>`
+3. `conan install . --output-folder=build --build=missing
+      -s build_type=<Debug|Release> -s compiler.cppstd=<gnuNN>`
+   (cppstd derived from the manifest's `cpp_std`, D12)
    → writes `build/conan_toolchain.cmake` + CMakeDeps configs into `build/`.
 4. `cmake -S . -B build -G Ninja \
       -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake \
@@ -246,3 +254,19 @@ no Conan profile management (use the `default` profile).
   preferred). Related: `carry add fmt@` (trailing `@`, empty version) is
   rejected with a `help:` hint — the `@` promises a version; dropping it is
   how you ask for "any".
+- **D12 (2026-09-21)** — `conan install` receives
+  `-s compiler.cppstd=<gnuNN>` derived from the manifest's `cpp_std`
+  (`c++23` → `gnu23`), overriding the profile's `cppstd` for the host
+  context. T009 (a glaze demo build) found the profile's `cppstd` (gnu20)
+  and the generated `CMakeLists.txt`'s `CMAKE_CXX_STANDARD 23` had diverged
+  since T004: benign for fmt (which never checks), but a hard error for
+  recipes that validate the standard — glaze/8.3.0 fails `conan install`
+  with `Invalid: Current cppstd (gnu20) is lower than the required C++
+  standard (23)`. The manifest is the single source of truth for the
+  standard (D3), so the graph must be resolved with it; the profile still
+  governs everything else (compiler, libcxx, arch). The `gnu` prefix
+  assumes the pinned GCC (D6) — MSVC/Clang support (§10.6) must revisit the
+  mapping. Unqualified `-s` targets the host context only; build-context
+  tool requirements keep the profile's standard (prebuilt in practice).
+  Side benefit: conan's toolchain now emits the same standard as the
+  generated CMakeLists, so the "modified to 23" configure warning is gone.

@@ -6,6 +6,27 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T009: glaze demo + C++ standard sync (D12)
+
+- **User-directed ad-hoc task (post-MVP):** run a temporary demo project through carry
+  using the **glaze** library and fix the C++ version issues. Demo
+  (`/tmp/glazedemo`: new → bare `add glaze` → JSON serialize/round-trip main + test).
+- **Bug:** profile `cppstd=gnu20` vs generated `CMAKE_CXX_STANDARD 23` diverged since
+  T004 — benign for fmt, but glaze/8.3.0's recipe *validates* the standard and
+  `conan install` failed: "Invalid: Current cppstd (gnu20) is lower than the required
+  C++ standard (23)" (conan exit 6), before any compilation.
+- **Fix → D12** (DESIGN.md §4/§6 + decision): `conan install` now gets
+  `-s compiler.cppstd=<gnuNN>` derived from the manifest `cpp_std` (`c++23` → `gnu23`);
+  `conan_cppstd()` in manifest.rs + flag in build.rs. Profile still governs everything
+  else. Bonus: the old "modified to 23" configure warning is gone.
+- **Demo-side (glaze 8.3.0 API, not carry bugs):** namespace is `glz`; entry points are
+  `glz::write_json(v, buf)` / `glz::read_json(v, buf)` (value first) — no `json_dump`
+  in 8.x.
+- Verification: hermetic `cargo test` 30 unit + 2 e2e green, clippy zero warnings;
+  `cargo test -- --ignored` → **glaze_full_loop (new regression guard) + fmt_full_loop
+  both ok (8.98s)**; manual demo loop build/run/test/release all green
+  (`serialized: {"name":"Alice","age":42}` + round-trip). One commit (T009).
+
 ## 2026-09-21 — T008: Polish — MVP frozen (closing entry for the MVP build)
 
 - **T008 done; all nine tasks (T000–T008) complete — carry 0.1.0 is frozen.** No behavior

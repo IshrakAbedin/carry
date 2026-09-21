@@ -113,10 +113,13 @@ library target is `<name>_lib`; the test target `test_<name>` is registered with
 
 `carry build` reads `CARRY.toml`, renders `conanfile.txt` and `CMakeLists.txt` in memory and
 rewrites them only if changed, then runs the pipeline: `conan install . --output-folder=build
---build=missing -s build_type=<Debug|Release>` (writes the Conan toolchain + CMakeDeps
-configs into `build/`), `cmake -S . -B build -G Ninja` with the Conan toolchain file, and
-`cmake --build build`. Build output streams straight to the terminal; a tool failure reports
-the tool, its exit code, and the exact command line.
+--build=missing -s build_type=<Debug|Release> -s compiler.cppstd=<from cpp_std>` (writes the
+Conan toolchain + CMakeDeps configs into `build/`), `cmake -S . -B build -G Ninja` with the
+Conan toolchain file, and `cmake --build build`. The `compiler.cppstd` override keeps the
+Conan graph resolved with the C++ standard the project actually compiles with (e.g. a
+dependency requiring C++23 works even if your Conan profile still says gnu20). Build output
+streams straight to the terminal; a tool failure reports the tool, its exit code, and the
+exact command line.
 
 ## For AI contributors
 

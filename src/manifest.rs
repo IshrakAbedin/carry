@@ -306,6 +306,20 @@ pub fn conan_ref(pkg: &str, version: &str) -> String {
     }
 }
 
+/// Map the manifest's `cpp_std` to a Conan `compiler.cppstd` setting (D12):
+/// the dependency graph must be resolved with the standard the generated
+/// CMakeLists compiles with. The pinned GCC toolchain (D6) uses the GNU
+/// dialect variants, so `c++23` → `gnu23`; a value that already carries the
+/// `gnu` prefix passes through unchanged.
+pub fn conan_cppstd(standard: &str) -> String {
+    let std = standard.strip_prefix("c++").unwrap_or(standard);
+    if std.starts_with("gnu") {
+        std.to_string()
+    } else {
+        format!("gnu{std}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -629,6 +643,17 @@ c_std   = \"c11\"
              \n\
              [dependencies]\n"
         );
+    }
+
+    #[test]
+    fn conan_cppstd_maps_to_gnu_variant() {
+        assert_eq!(conan_cppstd("c++23"), "gnu23");
+        assert_eq!(conan_cppstd("c++20"), "gnu20");
+        assert_eq!(conan_cppstd("c++17"), "gnu17");
+        // Already in Conan's gnu form: passes through.
+        assert_eq!(conan_cppstd("gnu23"), "gnu23");
+        // Bare number (the CMake mapping accepts it too).
+        assert_eq!(conan_cppstd("23"), "gnu23");
     }
 
     #[test]
