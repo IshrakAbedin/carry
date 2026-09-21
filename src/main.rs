@@ -19,7 +19,16 @@ use crate::manifest::Manifest;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "carry", version, about = "A C/C++ project manager in the spirit of Cargo")]
+#[command(
+    name = "carry",
+    version,
+    about = "A C/C++ project manager in the spirit of Cargo",
+    long_about = "A C/C++ project manager in the spirit of Cargo.\n\n\
+        One manifest (CARRY.toml) is the single source of truth: carry regenerates \
+        conanfile.txt and CMakeLists.txt from it on every build, then drives Conan 2 \
+        (dependencies), CMake (configure), and Ninja (build). You never edit the \
+        generated files."
+)]
 struct Cli {
     /// Print each external command before running it
     #[arg(long, global = true)]
@@ -45,6 +54,11 @@ enum Commands {
     Init,
 
     /// Regenerate files, install dependencies, configure, and build
+    #[command(long_about = "Regenerate the generated files from CARRY.toml (write-if-changed), \
+        then: `conan install` (resolve dependencies) → `cmake` configure → `ninja` build.\n\n\
+        Debug by default; `--release` builds Release. Build output lands in `build/`, \
+        executables in `build/bin/<name>`.\n\n\
+        `--verbose` prints each external command before running it.")]
     Build {
         /// Build with the Release build type (default: Debug)
         #[arg(long)]
@@ -52,10 +66,12 @@ enum Commands {
     },
 
     /// Build (Debug) then run the project binary with the given arguments
-    #[command(long_about = "Build (Debug), then run the project binary with the given arguments.\n\n\
+    #[command(long_about = "Build (Debug), then run `build/bin/<name>` with the given arguments.\n\n\
         Carry flags must come before user arguments; separate them with `--` when the program \
-        itself takes flags:\n\n    carry run -- --release")]
+        itself takes flags:\n\n    carry run -- --release\n\n\
+        The program's exit code is propagated as carry's exit code.")]
     Run {
+        /// Arguments passed to the program (use `--` to separate from carry flags)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
@@ -67,8 +83,14 @@ enum Commands {
     Clean,
 
     /// Add or update a dependency in CARRY.toml (e.g. `fmt` or `fmt@10.2.1`)
+    #[command(long_about = "Add or update a dependency in CARRY.toml (format-preserving).\n\n\
+        Spec: `pkg`, `pkg@version`, or `pkg@range` — e.g. `fmt`, `fmt@10.2.1`, \
+        `fmt@'>=10'` (quote the range so the shell keeps it as one argument). A bare `pkg` \
+        means \"any version\" (highest available, local cache preferred). Ranges are \
+        written to conanfile.txt as `pkg/[range]`.\n\n\
+        Prints `run: carry build` when the manifest changes.")]
     Add {
-        /// Package: `pkg` or `pkg@version` (version may be a range, e.g. `fmt@>=10`)
+        /// Package: `pkg` or `pkg@version` (version may be a range, e.g. `fmt@'>=10'`)
         pkg: String,
     },
 

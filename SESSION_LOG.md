@@ -6,6 +6,31 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T008: Polish — MVP frozen (closing entry for the MVP build)
+
+- **T008 done; all nine tasks (T000–T008) complete — carry 0.1.0 is frozen.** No behavior
+  changes needed: consistency pass found the version stamp already `CARGO_PKG_VERSION`-driven
+  and `carry --version` matching Cargo.toml. Work = README rewritten (user-facing: status +
+  honest limitations, requirements table, quick start with real captured output, command +
+  CARRY.toml references, version-spec incl. D11 quoting, "how it works", AI-contributors
+  pointer), and help polish in `src/main.rs` (top-level/`build`/`run`/`add` `long_about`s,
+  `run [ARGS]` help, exit-code propagation note).
+- Verification (clean room): `cargo clean && cargo build` (5.29s, zero warnings) →
+  `cargo test` (29 unit + 2 hermetic e2e ok, `fmt_full_loop` ignored per D8) →
+  `cargo clippy --all-targets` (zero warnings); two fresh scratch loops from zero — plain
+  `hello` (new→build→run) and `fmtapp --lib` + `fmt@10.2.1` (new→add→build→run→test→clean,
+  `100% tests passed`) — all green; `git status` clean except README + main.rs.
+- One benign note recorded, not filed: re-configure prints CMake `unused-cli` warning for
+  `CMAKE_TOOLCHAIN_FILE` (cached; reconfigure-every-build is intentional, DESIGN §6).
+- **The whole MVP build in one breath (2026-09-17 → 2026-09-21, 9 tasks + 1 issue fix):**
+  bootstrap of the repo-as-memory system (T000), clap CLI skeleton with error plumbing
+  (T001), CARRY.toml manifest + `new`/`init` (T002), the manifest→conanfile/CMakeLists
+  generator (T003), the conan→cmake→ninja build pipeline (T004), `run`/`test`/`clean`
+  (T005), format-preserving `add`/`remove` (T006), E2E hardening with a real fmt
+  dependency that surfaced and fixed 3 real bugs (T007, decisions D9–D11), the I001
+  .gitignore fix, and this polish pass (T008). Next: post-MVP list in DESIGN.md §10.
+- **Suggested (user decides, not executed): `git tag v0.1.0` on the T008 commit.**
+
 ## 2026-09-21 — Fix-issue session: I001 (CMakeUserPresets.json un-ignored)
 
 - **I001 fixed at root cause** (user-directed: fix open issues only, T008 polish deferred).
