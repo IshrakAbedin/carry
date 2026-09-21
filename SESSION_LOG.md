@@ -6,6 +6,30 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T003: Generator (manifest → conanfile.txt + CMakeLists.txt)
+
+- `generate.rs`: `render_conanfile`/`render_cmake` (DESIGN §5) + `regenerate`
+  (write-if-changed, returns changed-flags); `project.rs`: `find_project_root`
+  (walk up for CARRY.toml); `main.rs`: build/run/test call `prepare_project()`
+  (root → load → regenerate) before their not-implemented errors; `new`/`init`
+  now scaffold the real rendered files (placeholders deleted).
+- **Deviation → new decision D9 (dated in DESIGN.md + §5 line fixed):** the
+  §5 example's `target_link_libraries(test_demo PRIVATE demo ...)` does not
+  configure — CMake 4 forbids linking an EXECUTABLE into another target (and
+  `ENABLE_EXPORTS` would duplicate `main`). Test target now links the library
+  (if present) + deps only. Found by CMake-configuring the scratch scaffold.
+- Verification: build/clippy zero warnings, **14 unit tests pass** (3 goldens
+  + idempotence mtime-asserted + stale-rewrite); scratch: bin demo
+  conanfile = `[generators]` only, CMake configures + builds + ctest 100%
+  (no deps); hand-added fmt/zlib → 1st build regenerates (find_package +
+  `::` links), 2nd build mtimes unchanged; subdir discovery OK; outside dir
+  → `error: not a carry project (no CARRY.toml found)`; `--lib` scaffold
+  renders both targets, configures OK. See results/T003.md.
+- Next: T004 (build pipeline: conan → cmake → ninja). DESIGN §6 + D5/D6 are
+  the spec. Conan Center network still unverified (T007).
+
+---
+
 ## 2026-09-21 — T002: Manifest (CARRY.toml) + carry new/init
 
 - Found the working tree with an **interrupted previous session's uncommitted

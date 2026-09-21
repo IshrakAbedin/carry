@@ -81,7 +81,6 @@ impl Default for Build {
 
 impl Manifest {
     /// Read and parse `CARRY.toml` from `path`, then validate it.
-    #[allow(dead_code)] // first used by the build pipeline (T004)
     pub fn load(path: &Path) -> Result<Self> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("reading {}", path.display()))?;
@@ -216,7 +215,6 @@ pub fn validate_name(name: &str) -> Result<()> {
 /// Map a manifest dependency value to a Conan reference (DESIGN.md §4):
 /// plain version → `pkg/ver`, range (`>` `<` `=` `^` `~` prefix) → `pkg/[range]`,
 /// empty → `pkg/*`.
-#[allow(dead_code)] // first used by the generator (T003)
 pub fn conan_ref(pkg: &str, version: &str) -> String {
     match version.chars().next() {
         Some('>' | '<' | '=' | '^' | '~') => format!("{pkg}/[{version}]"),

@@ -122,7 +122,7 @@ target_include_directories(demo PRIVATE include)
 
 enable_testing()
 add_executable(test_demo tests/test_main.cpp)
-target_link_libraries(test_demo PRIVATE demo fmt::fmt)
+target_link_libraries(test_demo PRIVATE demo_lib fmt::fmt)   # lib (if present), then deps — never the exe (D9)
 add_test(NAME demo_tests COMMAND test_demo)
 ```
 
@@ -219,3 +219,9 @@ no Conan profile management (use the `default` profile).
   prompts). Every session follows the protocol in BOOTSTRAP.md and ends by recording.
 - **D8 (2026-09-17)** — E2E tests needing Conan Center network are `#[ignore]`d so the
   default test suite is hermetic; T007 exercises them manually and records the result.
+- **D9 (2026-09-21)** — The generated test target links the **library** target (when
+  present) plus the dependencies, and **never the executable** target. T003 found the
+  §5 example line `target_link_libraries(test_demo PRIVATE demo ...)` does not
+  configure: CMake 4 rejects linking an EXECUTABLE target into another target, and
+  even with `ENABLE_EXPORTS` it would duplicate `main` (exe's `src/main.cpp` vs the
+  test's `test_main.cpp`). The §5 example line was updated accordingly.

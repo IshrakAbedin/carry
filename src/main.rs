@@ -1,20 +1,21 @@
 //! carry — a C/C++ project manager in the spirit of Cargo.
 //!
-//! T001: CLI scaffold. All MVP subcommands from DESIGN.md §2 are defined.
-//! T002: `new`/`init` implemented (manifest + scaffold); the rest are stubs
-//! returning "not implemented" until their owning task lands
-//! (build → T004, run/test/clean → T005, add/remove → T006).
+//! T001: CLI scaffold. T002: `new`/`init` (manifest + scaffold).
+//! T003: generator wired in — `build`/`run`/`test` first locate the project,
+//! load the manifest, and regenerate the generated files (write-if-changed),
+//! then still report "not implemented" until T004/T005 land the pipelines
+//! (clean → T005, add/remove → T006).
 
 // Module files are empty scaffolds until their owning tasks fill them in;
-// remove the allow on each as it becomes used (T004–T006).
+// remove the allow on each as it becomes used (T004–T005).
 #[allow(dead_code)]
 mod build;
-#[allow(dead_code)]
 mod generate;
 mod manifest;
-#[allow(dead_code)]
 mod project;
 mod template;
+
+use crate::manifest::Manifest;
 
 use clap::{Parser, Subcommand};
 
@@ -92,11 +93,30 @@ fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Commands::New { name, lib } => template::cmd_new(&name, lib),
         Commands::Init => template::cmd_init(),
-        Commands::Build { .. } => Err(not_implemented("build", "T004")),
-        Commands::Run { .. } => Err(not_implemented("run", "T005")),
-        Commands::Test => Err(not_implemented("test", "T005")),
+        Commands::Build { .. } => {
+            prepare_project()?;
+            Err(not_implemented("build", "T004"))
+        }
+        Commands::Run { .. } => {
+            prepare_project()?;
+            Err(not_implemented("run", "T005"))
+        }
+        Commands::Test => {
+            prepare_project()?;
+            Err(not_implemented("test", "T005"))
+        }
         Commands::Clean => Err(not_implemented("clean", "T005")),
         Commands::Add { .. } => Err(not_implemented("add", "T006")),
         Commands::Remove { .. } => Err(not_implemented("remove", "T006")),
     }
+}
+
+/// Shared first step for `build`/`run`/`test` (DESIGN.md §6, steps 1–2):
+/// locate the project root, load the manifest, and regenerate the generated
+/// files (write-if-changed).
+fn prepare_project() -> anyhow::Result<()> {
+    let root = project::find_project_root()?;
+    let manifest = Manifest::load(&root.join(project::MANIFEST_NAME))?;
+    let _ = generate::regenerate(&manifest, &root)?;
+    Ok(())
 }
