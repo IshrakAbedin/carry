@@ -2,13 +2,10 @@
 //!
 //! T001: CLI scaffold. T002: `new`/`init` (manifest + scaffold).
 //! T003: generator wired in — `build`/`run`/`test` first locate the project,
-//! load the manifest, and regenerate the generated files (write-if-changed),
-//! then still report "not implemented" until T004/T005 land the pipelines
-//! (clean → T005, add/remove → T006).
+//! load the manifest, and regenerate the generated files (write-if-changed).
+//! T004: `build` runs the real pipeline (conan → cmake → ninja); `run`/`test`
+//! still report "not implemented" until T005 (clean → T005, add/remove → T006).
 
-// Module files are empty scaffolds until their owning tasks fill them in;
-// remove the allow on each as it becomes used (T004–T005).
-#[allow(dead_code)]
 mod build;
 mod generate;
 mod manifest;
@@ -22,9 +19,8 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "carry", version, about = "A C/C++ project manager in the spirit of Cargo")]
 struct Cli {
-    /// Print each external command before running it (wired up in T004)
+    /// Print each external command before running it
     #[arg(long, global = true)]
-    #[allow(dead_code)]
     verbose: bool,
 
     #[command(subcommand)]
@@ -87,15 +83,16 @@ fn main() {
 }
 
 fn run(cli: Cli) -> anyhow::Result<()> {
+    let Cli { verbose, command } = cli;
     let not_implemented = |cmd: &str, planned: &str| -> anyhow::Error {
         anyhow::anyhow!("{cmd} not implemented yet (planned in {planned})")
     };
-    match cli.command {
+    match command {
         Commands::New { name, lib } => template::cmd_new(&name, lib),
         Commands::Init => template::cmd_init(),
-        Commands::Build { .. } => {
-            prepare_project()?;
-            Err(not_implemented("build", "T004"))
+        Commands::Build { release } => {
+            let root = project::find_project_root()?;
+            build::build(&root, release, verbose)
         }
         Commands::Run { .. } => {
             prepare_project()?;

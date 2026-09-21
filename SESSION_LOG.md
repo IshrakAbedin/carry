@@ -6,6 +6,29 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T004: Build pipeline (conan → cmake → ninja)
+
+- `build.rs`: `run()` (streamed stdout/stderr, verbose `$` line, missing-tool
+  + non-zero-exit errors per DESIGN §6) and `build()` (load → regenerate →
+  conan install → cmake configure → cmake --build, identical with/without
+  deps). `main.rs`: Build arm wired; run/test stubs kept for T005.
+- **Bug caught by acceptance:** conan's `-s build_type=…` must be two argv
+  tokens — one combined token made conan parse the setting name as
+  `settings. build_type` (with a space) and fail. Fixed; CMake `-D` flags are
+  correctly single tokens.
+- Verification: build/clippy zero warnings, **16 unit tests pass** (+2 for
+  `run()` error messages); scratch `hello` (no deps): first real conan install
+  OK in ~1.1 s (cache pre-initialized, no CMake 4.x warning), binary prints
+  greeting, `--release` flips CMakeCache to Release, deliberate syntax error
+  streams g++ diagnostics + `error: cmake failed with exit code 1` (exit 1),
+  `--verbose` prints all three `$` lines, no-op rebuild 0.3 s
+  (`ninja: no work to do`). See results/T004.md.
+- **New issue I001:** conan writes `CMakeUserPresets.json` at project root,
+  un-covered by scaffold `.gitignore` (template-domain fix, deferred).
+- Next: T005 (run/test/clean). Conan Center network still unverified (T007).
+
+---
+
 ## 2026-09-21 — T003: Generator (manifest → conanfile.txt + CMakeLists.txt)
 
 - `generate.rs`: `render_conanfile`/`render_cmake` (DESIGN §5) + `regenerate`
