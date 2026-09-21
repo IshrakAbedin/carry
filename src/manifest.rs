@@ -1,8 +1,8 @@
-//! CARRY.toml manifest: serde schema, load/save, validation, conan ref mapping.
+//! CARRY.toml manifest: serde schema, load/save, validation, conan ref mapping,
+//! and the format-preserving `add`/`remove` dependency commands (T006).
 //!
 //! The manifest is the single source of truth for a carry project (DESIGN.md §4).
-//! `save` goes through `toml_edit` so user comments and formatting survive edits
-//! (the format-preserving `add`/`remove` commands build on this in T006).
+//! `save` goes through `toml_edit` so user comments and formatting survive edits.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -133,6 +133,75 @@ impl Manifest {
         }
         Ok(())
     }
+
+    /// Add or update a dependency, saving `path` via a `toml_edit` round-trip
+    /// so every other line (comments, spacing) survives. Same version → no
+    /// write, "already up to date". Prints what changed and, after a write,
+    /// the `run: carry build` hint (the generated files pick the change up on
+    /// the next build — this never builds itself).
+    pub fn add_dep(&mut self, path: &Path, pkg: &str, version: &str) -> Result<()> {
+        validate_labeled_name("dependency", pkg)?;
+        match self.dependencies.get(pkg) {
+            Some(existing) if existing == version => {
+                println!("{pkg} already up to date");
+                return Ok(());
+            }
+            Some(old) => {
+                let old = old.clone();
+                self.dependencies.insert(pkg.to_string(), version.to_string());
+                self.save(path)?;
+                println!("updated {pkg} {} → {}", display_version(&old), display_version(version));
+            }
+            None => {
+                self.dependencies.insert(pkg.to_string(), version.to_string());
+                self.save(path)?;
+                if version.is_empty() {
+                    println!("added {pkg}");
+                } else {
+                    println!("added {pkg} {version}");
+                }
+            }
+        }
+        println!("run: carry build");
+        Ok(())
+    }
+
+    /// Remove a dependency, saving `path` via a `toml_edit` round-trip. The
+    /// `[dependencies]` table is left in place even when it becomes empty
+    /// (stable diff; the user may re-add). A `pkg@version` spec is tolerated —
+    /// only the name is used. Errors if the dependency is not present.
+    pub fn remove_dep(&mut self, path: &Path, pkg: &str) -> Result<()> {
+        let name = pkg.rsplit_once('@').map_or(pkg, |(n, _)| n);
+        let Some(old) = self.dependencies.remove(name) else {
+            anyhow::bail!("dependency '{name}' not found in CARRY.toml");
+        };
+        self.save(path)?;
+        println!("removed {name} {}", display_version(&old));
+        println!("run: carry build");
+        Ok(())
+    }
+}
+
+/// Parse a dependency spec `pkg` or `pkg@version`, splitting on the **last**
+/// `@`, and validate the name with the manifest name rule. The version part
+/// may be plain (`10.2.1`) or a range (`>=10`); bare `pkg` stores an empty
+/// version (maps to `pkg/*` via `conan_ref`).
+pub fn parse_dep_spec(spec: &str) -> Result<(String, String)> {
+    let (name, version) = match spec.rsplit_once('@') {
+        Some((n, v)) => (n, v.to_string()),
+        None => (spec, String::new()),
+    };
+    validate_labeled_name("dependency", name)?;
+    Ok((name.to_string(), version))
+}
+
+/// Empty version (bare `pkg`) is shown as `(any)` in change messages.
+fn display_version(version: &str) -> &str {
+    if version.is_empty() {
+        "(any)"
+    } else {
+        version
+    }
 }
 
 /// Set every manifest value into an (existing or fresh) toml_edit document.
@@ -201,15 +270,21 @@ pub fn is_valid_name(name: &str) -> bool {
     first && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
 
-/// Validate a project name, with a `help:` hint on failure.
-pub fn validate_name(name: &str) -> Result<()> {
+/// Validate a name against the `[a-z0-9_][a-z0-9_-]*` rule (DESIGN.md §4),
+/// with a `help:` hint on failure. `label` is "project" or "dependency".
+fn validate_labeled_name(label: &str, name: &str) -> Result<()> {
     anyhow::ensure!(
         is_valid_name(name),
-        "invalid project name {name:?}\n\
+        "invalid {label} name {name:?}\n\
          help: names must match [a-z0-9_][a-z0-9_-] \
          (lowercase letters, digits, '_', '-'; must not start with '-')"
     );
     Ok(())
+}
+
+/// Validate a project name, with a `help:` hint on failure.
+pub fn validate_name(name: &str) -> Result<()> {
+    validate_labeled_name("project", name)
 }
 
 /// Map a manifest dependency value to a Conan reference (DESIGN.md §4):
@@ -372,6 +447,176 @@ zeta = \">=1.0\"
             let err = m.validate().unwrap_err().to_string();
             assert!(err.contains("help:"), "missing help hint in: {err}");
         }
+    }
+
+    /// A manifest with comments and odd spacing, and NO `[dependencies]`
+    /// table (the harder add case: the table must be created).
+    const COMMENTED_NO_DEPS: &str = "\
+# my project
+[package]
+name = \"demo\"
+# pinned version
+version = \"0.1.0\"
+type = \"bin\"
+
+[build]
+cpp_std = \"c++23\"
+c_std   = \"c11\"
+";
+
+    fn write_manifest(dir_name: &str, content: &str) -> std::path::PathBuf {
+        let dir = test_dir(dir_name);
+        let path = dir.join("CARRY.toml");
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn parse_dep_spec_forms() {
+        assert_eq!(parse_dep_spec("fmt").unwrap(), ("fmt".into(), String::new()));
+        assert_eq!(
+            parse_dep_spec("fmt@10.2.1").unwrap(),
+            ("fmt".into(), "10.2.1".into())
+        );
+        assert_eq!(
+            parse_dep_spec("fmt@>=10").unwrap(),
+            ("fmt".into(), ">=10".into())
+        );
+        // Split on the LAST '@': a '@' in the name part → invalid name.
+        assert!(parse_dep_spec("a@b@c").is_err());
+        for bad in ["Bad-Pkg", "-x", "", "bad name", "bad/name", "böhm"] {
+            let err = parse_dep_spec(bad).unwrap_err().to_string();
+            assert!(
+                err.contains("invalid dependency name") && err.contains("help:"),
+                "{bad:?}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn add_dep_new_appends_table() {
+        let path = write_manifest("manifest-add-new", COMMENTED_NO_DEPS);
+        let mut m = Manifest::load(&path).unwrap();
+        m.add_dep(&path, "fmt", "10.2.1").unwrap();
+        assert_eq!(m.dependencies.get("fmt").map(String::as_str), Some("10.2.1"));
+        let text = std::fs::read_to_string(&path).unwrap();
+        // New table appended at the end with a blank line before it.
+        assert!(text.ends_with("[dependencies]\nfmt = \"10.2.1\"\n"), "\n{text}");
+    }
+
+    #[test]
+    fn add_dep_replaces_version_in_place() {
+        let path = write_manifest("manifest-add-replace", FULL);
+        let mut m = Manifest::load(&path).unwrap();
+        m.add_dep(&path, "fmt", "11.0.0").unwrap();
+        assert_eq!(m.dependencies.get("fmt").map(String::as_str), Some("11.0.0"));
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("fmt = \"11.0.0\""), "\n{text}");
+        assert!(!text.contains("10.2.1"), "old version must be gone:\n{text}");
+        // The other dependency is untouched.
+        assert!(text.contains("zeta = \">=1.0\""), "\n{text}");
+    }
+
+    #[test]
+    fn add_dep_same_version_writes_nothing() {
+        let path = write_manifest("manifest-add-same", FULL);
+        let before = std::fs::read_to_string(&path).unwrap();
+        let mtime_before = std::fs::metadata(&path).unwrap().modified().unwrap();
+        let mut m = Manifest::load(&path).unwrap();
+        m.add_dep(&path, "fmt", "10.2.1").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            before,
+            "content must be unchanged"
+        );
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().modified().unwrap(),
+            mtime_before,
+            "file must not be rewritten at all"
+        );
+    }
+
+    #[test]
+    fn add_dep_rejects_invalid_name() {
+        let path = write_manifest("manifest-add-badname", FULL);
+        let mut m = Manifest::load(&path).unwrap();
+        let err = m.add_dep(&path, "Bad-Pkg", "1.0").unwrap_err().to_string();
+        assert!(
+            err.contains("invalid dependency name") && err.contains("help:"),
+            "{err}"
+        );
+        // The manifest is untouched.
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), FULL);
+    }
+
+    #[test]
+    fn remove_dep_present_keeps_table_header() {
+        let path = write_manifest("manifest-remove-present", FULL);
+        let mut m = Manifest::load(&path).unwrap();
+        m.remove_dep(&path, "fmt").unwrap();
+        assert!(!m.dependencies.contains_key("fmt"));
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("[dependencies]"), "table header must remain:\n{text}");
+        assert!(!text.contains("fmt"), "key must be gone:\n{text}");
+        assert!(text.contains("zeta = \">=1.0\""), "other deps untouched:\n{text}");
+        // A pkg@version spec is tolerated — only the name matters.
+        m.remove_dep(&path, "zeta@>=1.0").unwrap();
+        assert!(m.dependencies.is_empty());
+    }
+
+    #[test]
+    fn remove_dep_absent_errors_and_writes_nothing() {
+        let path = write_manifest("manifest-remove-absent", FULL);
+        let mut m = Manifest::load(&path).unwrap();
+        let err = m.remove_dep(&path, "boost").unwrap_err();
+        assert_eq!(err.to_string(), "dependency 'boost' not found in CARRY.toml");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), FULL, "file must be unchanged");
+    }
+
+    /// A CARRY.toml with comments and odd spacing keeps comments/spacing after
+    /// add + remove (asserted on the exact raw string).
+    #[test]
+    fn add_remove_preserves_comments_and_spacing() {
+        let path = write_manifest("manifest-format-preserve", COMMENTED_NO_DEPS);
+        let mut m = Manifest::load(&path).unwrap();
+
+        m.add_dep(&path, "fmt", "10.2.1").unwrap();
+        let after_add = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            after_add,
+            "# my project\n\
+             [package]\n\
+             name = \"demo\"\n\
+             # pinned version\n\
+             version = \"0.1.0\"\n\
+             type = \"bin\"\n\
+             \n\
+             [build]\n\
+             cpp_std = \"c++23\"\n\
+             c_std   = \"c11\"\n\
+             \n\
+             [dependencies]\n\
+             fmt = \"10.2.1\"\n"
+        );
+
+        m.remove_dep(&path, "fmt").unwrap();
+        let after_remove = std::fs::read_to_string(&path).unwrap();
+        // Key gone; the (now empty) table header remains.
+        assert_eq!(
+            after_remove,
+            "# my project\n\
+             [package]\n\
+             name = \"demo\"\n\
+             # pinned version\n\
+             version = \"0.1.0\"\n\
+             type = \"bin\"\n\
+             \n\
+             [build]\n\
+             cpp_std = \"c++23\"\n\
+             c_std   = \"c11\"\n\
+             \n\
+             [dependencies]\n"
+        );
     }
 
     #[test]

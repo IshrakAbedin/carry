@@ -5,7 +5,8 @@
 //! load the manifest, and regenerate the generated files (write-if-changed).
 //! T004: `build` runs the real pipeline (conan → cmake → ninja).
 //! T005: `run` (build Debug + exec, child exit code propagated), `test`
-//! (build Debug + ctest), `clean` (remove build/). add/remove → T006.
+//! (build Debug + ctest), `clean` (remove build/).
+//! T006: `add`/`remove` (CARRY.toml dependency edits, format-preserving).
 
 mod build;
 mod generate;
@@ -65,13 +66,13 @@ enum Commands {
     /// Remove the build/ directory
     Clean,
 
-    /// Add or update a dependency (e.g. `fmt` or `fmt/10.2.1`)
+    /// Add or update a dependency in CARRY.toml (e.g. `fmt` or `fmt@10.2.1`)
     Add {
-        /// Package spec
+        /// Package: `pkg` or `pkg@version` (version may be a range, e.g. `fmt@>=10`)
         pkg: String,
     },
 
-    /// Remove a dependency
+    /// Remove a dependency from CARRY.toml
     Remove {
         /// Package name
         pkg: String,
@@ -88,9 +89,6 @@ fn main() {
 
 fn run(cli: Cli) -> anyhow::Result<()> {
     let Cli { verbose, command } = cli;
-    let not_implemented = |cmd: &str, planned: &str| -> anyhow::Error {
-        anyhow::anyhow!("{cmd} not implemented yet (planned in {planned})")
-    };
     match command {
         Commands::New { name, lib } => template::cmd_new(&name, lib),
         Commands::Init => template::cmd_init(),
@@ -111,7 +109,18 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             let root = project::find_project_root()?;
             build::clean_cmd(&root)
         }
-        Commands::Add { .. } => Err(not_implemented("add", "T006")),
-        Commands::Remove { .. } => Err(not_implemented("remove", "T006")),
+        Commands::Add { pkg } => {
+            let root = project::find_project_root()?;
+            let path = root.join(project::MANIFEST_NAME);
+            let (name, version) = manifest::parse_dep_spec(&pkg)?;
+            let mut m = Manifest::load(&path)?;
+            m.add_dep(&path, &name, &version)
+        }
+        Commands::Remove { pkg } => {
+            let root = project::find_project_root()?;
+            let path = root.join(project::MANIFEST_NAME);
+            let mut m = Manifest::load(&path)?;
+            m.remove_dep(&path, &pkg)
+        }
     }
 }

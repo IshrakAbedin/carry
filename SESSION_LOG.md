@@ -6,6 +6,30 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T006: carry add / carry remove (format-preserving)
+
+- `manifest.rs`: `parse_dep_spec` (split on **last** `@`, name rule via new
+  labeled validator so errors say "invalid dependency name"),
+  `Manifest::add_dep` (same version → no write at all, mtime preserved; replace
+  → in-place line update; new → table appended with blank line; prints
+  `added`/`updated`/`already up to date` + `run: carry build` hint after a
+  write), `Manifest::remove_dep` (absent → exact error, empty `[dependencies]`
+  left in place, tolerates `pkg@version`). No manual toml_edit decoration code
+  needed — probes confirmed toml_edit 0.25 handles new-table/new-key
+  serialization. `main.rs`: arms wired, stub closure deleted, `add` help text
+  fixed (`fmt@10.2.1`, not `fmt/10.2.1`). +8 unit tests (28 total) incl.
+  exact-raw-string formatting-preservation test.
+- Verification: build/clippy zero warnings, **28 unit tests pass**; scratch
+  with hand-written commented CARRY.toml: add → diff = only the new line,
+  `# my deps` intact; re-add same → no file change; add 11.0.0 → in-place
+  update; remove → key gone, header + comment remain; remove again →
+  `error: dependency 'fmt' not found in CARRY.toml` exit 1; `add Bad-Pkg` →
+  error + `help:` exit 1. See results/T006.md.
+- **Conan Center network verified working** (resolves the T007 caveat):
+  `carry build` with `fmt/10.2.1` downloaded the recipe from conancenter and
+  built the binary via `--build=missing`; full pipeline exit 0. No new issues
+  (I001 unchanged). Next: T007 — use fmt *in code* end to end.
+
 ## 2026-09-21 — T005: carry run / test (ctest) / clean
 
 - `build.rs`: `build()` split into public wrapper + private `build_with`
