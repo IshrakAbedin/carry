@@ -1,20 +1,19 @@
 //! carry — a C/C++ project manager in the spirit of Cargo.
 //!
-//! T001: CLI scaffold. All MVP subcommands from DESIGN.md §2 are defined; each
-//! command is a stub returning "not implemented" until its owning task lands
-//! (new/init → T002, build → T004, run/test/clean → T005, add/remove → T006).
+//! T001: CLI scaffold. All MVP subcommands from DESIGN.md §2 are defined.
+//! T002: `new`/`init` implemented (manifest + scaffold); the rest are stubs
+//! returning "not implemented" until their owning task lands
+//! (build → T004, run/test/clean → T005, add/remove → T006).
 
 // Module files are empty scaffolds until their owning tasks fill them in;
-// remove the allow on each as it becomes used (T002–T005).
+// remove the allow on each as it becomes used (T004–T006).
 #[allow(dead_code)]
 mod build;
 #[allow(dead_code)]
 mod generate;
-#[allow(dead_code)]
 mod manifest;
 #[allow(dead_code)]
 mod project;
-#[allow(dead_code)]
 mod template;
 
 use clap::{Parser, Subcommand};
@@ -80,18 +79,24 @@ enum Commands {
 
 fn main() {
     let cli = Cli::parse();
-    let not_implemented = |cmd: &str, planned: &str| -> ! {
-        eprintln!("error: {cmd} not implemented yet (planned in {planned})");
+    if let Err(err) = run(cli) {
+        eprintln!("error: {err}");
         std::process::exit(1);
+    }
+}
+
+fn run(cli: Cli) -> anyhow::Result<()> {
+    let not_implemented = |cmd: &str, planned: &str| -> anyhow::Error {
+        anyhow::anyhow!("{cmd} not implemented yet (planned in {planned})")
     };
     match cli.command {
-        Commands::New { .. } => not_implemented("new", "T002"),
-        Commands::Init => not_implemented("init", "T002"),
-        Commands::Build { .. } => not_implemented("build", "T004"),
-        Commands::Run { .. } => not_implemented("run", "T005"),
-        Commands::Test => not_implemented("test", "T005"),
-        Commands::Clean => not_implemented("clean", "T005"),
-        Commands::Add { .. } => not_implemented("add", "T006"),
-        Commands::Remove { .. } => not_implemented("remove", "T006"),
+        Commands::New { name, lib } => template::cmd_new(&name, lib),
+        Commands::Init => template::cmd_init(),
+        Commands::Build { .. } => Err(not_implemented("build", "T004")),
+        Commands::Run { .. } => Err(not_implemented("run", "T005")),
+        Commands::Test => Err(not_implemented("test", "T005")),
+        Commands::Clean => Err(not_implemented("clean", "T005")),
+        Commands::Add { .. } => Err(not_implemented("add", "T006")),
+        Commands::Remove { .. } => Err(not_implemented("remove", "T006")),
     }
 }

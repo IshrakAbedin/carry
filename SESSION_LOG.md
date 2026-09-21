@@ -6,6 +6,25 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T002: Manifest (CARRY.toml) + carry new/init
+
+- Found the working tree with an **interrupted previous session's uncommitted
+  T002 work** (manifest.rs/template.rs implemented, STATE.md still "pending").
+  Reviewed the diff against T002 scope, verified it, and completed the task.
+- `manifest.rs`: serde schema w/ defaults, `load`/`save` (toml_edit,
+  comment-preserving, drops stale deps), validation w/ `help:` hints, `conan_ref`.
+- `template.rs`: scaffold consts + `cmd_new`/`cmd_init` (`{ident}` = dashes→
+  underscores for C++ names); placeholders for conanfile.txt/CMakeLists.txt (T003).
+- `main.rs`: stub dispatch seam became `run(cli) -> anyhow::Result` (old `-> !`
+  closure can't carry real errors); New/Init wired, six stubs unchanged.
+- Verification: build/clippy zero warnings, **9 unit tests pass**, scratch-dir
+  checks all green (new --lib tree = DESIGN §3, g++ compile+run OK, all error
+  paths exit 1 with help hints). See results/T002.md.
+- Next: T003 (generator: manifest → conanfile.txt + CMakeLists.txt).
+  Conan Center network still unverified (T007).
+
+---
+
 ## 2026-09-18 — T001: Rust CLI scaffold
 
 - `cargo init` (edition 2024) at repo root; deps `clap 4.6.7` (derive) + `anyhow 1.0.104` only.
