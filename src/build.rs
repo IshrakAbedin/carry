@@ -16,17 +16,18 @@ use crate::generate;
 use crate::manifest::Manifest;
 use crate::project::MANIFEST_NAME;
 
-/// `carry build [--release]` (DESIGN.md §6, steps 1–5): load the manifest,
+/// `carry build [--release]` (DESIGN.md §6, steps 1–6): load the manifest,
 /// then `build_with`.
 pub fn build(root: &Path, release: bool, verbose: bool) -> Result<()> {
     let manifest = Manifest::load(&root.join(MANIFEST_NAME))?;
     build_with(&manifest, root, release, verbose)
 }
 
-/// The pipeline (DESIGN.md §6, steps 1–5) with the manifest already loaded:
+/// The pipeline (DESIGN.md §6, steps 1–6) with the manifest already loaded:
 /// regenerate the generated files (write-if-changed), then conan install →
-/// cmake configure → cmake --build, all in `root`. The pipeline is identical
-/// with and without dependencies: conan writes the toolchain file either way.
+/// cmake configure → export the compile database to the project root (D13) →
+/// cmake --build, all in `root`. The pipeline is identical with and without
+/// dependencies: conan writes the toolchain file either way.
 fn build_with(manifest: &Manifest, root: &Path, release: bool, verbose: bool) -> Result<()> {
     generate::regenerate(manifest, root)?;
 
@@ -67,6 +68,9 @@ fn build_with(manifest: &Manifest, root: &Path, release: bool, verbose: bool) ->
             "Ninja",
             "-DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake",
             &format!("-DCMAKE_BUILD_TYPE={build_type}"),
+            // Export the compile database (D13); the root-facing copy is
+            // written by export_compile_commands below.
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             "-DCMAKE_C_COMPILER=gcc",
             "-DCMAKE_CXX_COMPILER=g++",
         ],
@@ -74,7 +78,29 @@ fn build_with(manifest: &Manifest, root: &Path, release: bool, verbose: bool) ->
         verbose,
     )?;
 
+    export_compile_commands(root)?;
+
     run("cmake", &["--build", "build"], root, verbose)
+}
+
+/// The editor-facing compile database (D13). After configure, CMake has
+/// written `build/compile_commands.json` (`CMAKE_EXPORT_COMPILE_COMMANDS=ON`);
+/// editors (clangd, VS Code) default to the project **root**, so carry copies
+/// it there, write-if-changed — a no-op rebuild keeps the file's mtime
+/// stable, so editor file-watchers are not triggered.
+pub fn export_compile_commands(root: &Path) -> Result<()> {
+    let src = root.join("build").join("compile_commands.json");
+    let dst = root.join("compile_commands.json");
+    let content = std::fs::read_to_string(&src)
+        .with_context(|| format!("reading {}", src.display()))?;
+    match std::fs::read_to_string(&dst) {
+        Ok(existing) if existing == content => return Ok(()),
+        Ok(_) => {}
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+        Err(err) => return Err(err).with_context(|| format!("reading {}", dst.display())),
+    }
+    std::fs::write(&dst, &content).with_context(|| format!("writing {}", dst.display()))?;
+    Ok(())
 }
 
 /// Run `cmd args...` in `cwd` with stdout/stderr inherited. Prints
@@ -153,16 +179,23 @@ pub fn test_cmd(root: &Path, verbose: bool) -> Result<()> {
     run("ctest", &["--test-dir", "build", "--output-on-failure"], root, verbose)
 }
 
-/// `carry clean` (DESIGN.md §2): remove `root/build` recursively. If `build`
-/// is absent, print "nothing to clean". A `build` symlink pointing outside
-/// the project is refused (safety); a symlink pointing inside removes the
-/// link itself, never the target.
+/// `carry clean` (DESIGN.md §2): remove `root/build` recursively, plus the
+/// root `compile_commands.json` export (D13) — a stale export pointing at a
+/// wiped build/ is worse than none. If neither is present, print
+/// "nothing to clean". A `build` symlink pointing outside the project is
+/// refused (safety); a symlink pointing inside removes the link itself,
+/// never the target.
 pub fn clean_cmd(root: &Path) -> Result<()> {
     let build = root.join("build");
+    let has_compile_commands = std::fs::symlink_metadata(root.join("compile_commands.json")).is_ok();
     let meta = match std::fs::symlink_metadata(&build) {
         Ok(meta) => meta,
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            println!("nothing to clean");
+            if has_compile_commands {
+                remove_compile_commands(root)?;
+            } else {
+                println!("nothing to clean");
+            }
             return Ok(());
         }
         Err(err) => return Err(err).with_context(|| format!("reading {}", build.display())),
@@ -177,6 +210,9 @@ pub fn clean_cmd(root: &Path) -> Result<()> {
                 std::fs::remove_file(&build)
                     .with_context(|| format!("removing {}", build.display()))?;
                 println!("removed build/ (symlink)");
+                if has_compile_commands {
+                    remove_compile_commands(root)?;
+                }
                 return Ok(());
             }
             Ok(canon_target) => {
@@ -198,11 +234,25 @@ pub fn clean_cmd(root: &Path) -> Result<()> {
         }
         std::fs::remove_file(&build).with_context(|| format!("removing {}", build.display()))?;
         println!("removed build/ (symlink)");
+        if has_compile_commands {
+            remove_compile_commands(root)?;
+        }
         return Ok(());
     }
     std::fs::remove_dir_all(&build)
         .with_context(|| format!("removing {}", build.display()))?;
     println!("removed build/");
+    if has_compile_commands {
+        remove_compile_commands(root)?;
+    }
+    Ok(())
+}
+
+/// Remove the root `compile_commands.json` export (D13) and report it.
+fn remove_compile_commands(root: &Path) -> Result<()> {
+    let path = root.join("compile_commands.json");
+    std::fs::remove_file(&path).with_context(|| format!("removing {}", path.display()))?;
+    println!("removed compile_commands.json");
     Ok(())
 }
 
@@ -272,5 +322,84 @@ mod tests {
         clean_cmd(dir.path()).unwrap();
         assert!(!dir.path().join("build").exists(), "link must be removed");
         assert!(inside.exists(), "target must survive");
+    }
+
+    const CC_CONTENT: &str =
+        r#"[{"directory": "/src", "file": "src/main.cpp", "command": "g++ -c src/main.cpp"}]"#;
+
+    #[test]
+    fn export_copies_compile_commands_to_root() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("build")).unwrap();
+        std::fs::write(dir.path().join("build/compile_commands.json"), CC_CONTENT).unwrap();
+
+        export_compile_commands(dir.path()).unwrap();
+
+        let root_cc = dir.path().join("compile_commands.json");
+        assert_eq!(std::fs::read_to_string(root_cc).unwrap(), CC_CONTENT);
+    }
+
+    #[test]
+    fn export_is_write_if_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("build")).unwrap();
+        std::fs::write(dir.path().join("build/compile_commands.json"), CC_CONTENT).unwrap();
+
+        export_compile_commands(dir.path()).unwrap();
+        let root_cc = dir.path().join("compile_commands.json");
+        let mtime = std::fs::metadata(&root_cc).unwrap().modified().unwrap();
+
+        export_compile_commands(dir.path()).unwrap();
+
+        assert_eq!(
+            std::fs::metadata(&root_cc).unwrap().modified().unwrap(),
+            mtime,
+            "an unchanged command set must not rewrite the root file"
+        );
+    }
+
+    #[test]
+    fn export_updates_stale_root_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("build")).unwrap();
+        let root_cc = dir.path().join("compile_commands.json");
+        std::fs::write(dir.path().join("build/compile_commands.json"), CC_CONTENT).unwrap();
+        std::fs::write(&root_cc, "stale").unwrap();
+
+        export_compile_commands(dir.path()).unwrap();
+
+        assert_eq!(std::fs::read_to_string(root_cc).unwrap(), CC_CONTENT);
+    }
+
+    #[test]
+    fn export_missing_build_file_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = export_compile_commands(dir.path()).unwrap_err();
+        assert!(
+            err.to_string().contains("build/compile_commands.json"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn clean_removes_root_compile_commands_alongside_build() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("build")).unwrap();
+        std::fs::write(dir.path().join("compile_commands.json"), CC_CONTENT).unwrap();
+
+        clean_cmd(dir.path()).unwrap();
+
+        assert!(!dir.path().join("build").exists());
+        assert!(!dir.path().join("compile_commands.json").exists());
+    }
+
+    #[test]
+    fn clean_stray_compile_commands_without_build() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("compile_commands.json"), CC_CONTENT).unwrap();
+
+        clean_cmd(dir.path()).unwrap();
+
+        assert!(!dir.path().join("compile_commands.json").exists());
     }
 }

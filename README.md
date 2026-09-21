@@ -70,10 +70,10 @@ run: carry build
 |---|---|
 | `carry new <name> [--lib]` | Create `./<name>/` scaffold (executable by default; `--lib` adds a library target) |
 | `carry init` | Turn the current directory into a carry project (name from the directory) |
-| `carry build [--release]` | Regenerate files → `conan install` → CMake configure → Ninja build (Debug default) |
+| `carry build [--release]` | Regenerate files → `conan install` → CMake configure → Ninja build (Debug default); exports `compile_commands.json` for editors |
 | `carry run [args]...` | Build (Debug), then run `build/bin/<name>` with your args; the program's exit code is carried through |
 | `carry test` | Build (Debug), then `ctest --output-on-failure` |
-| `carry clean` | Remove `build/` |
+| `carry clean` | Remove `build/` (and the root `compile_commands.json`) |
 | `carry add <pkg>[@<version>]` | Add or update a dependency in `CARRY.toml` (format-preserving) |
 | `carry remove <pkg>` | Remove a dependency from `CARRY.toml` |
 | `--verbose` (global) | Print each external command before running it |
@@ -107,7 +107,10 @@ fmt = "10.2.1"         # pkg = version or range (see above)
 
 Conventions: build dir is `build/` (gitignored); executables land in `build/bin/<name>`; the
 library target is `<name>_lib`; the test target `test_<name>` is registered with CTest as
-`<name>_tests`; a dependency's CMake target is `<pkg>::<pkg>` (Conan 2 default).
+`<name>_tests`; a dependency's CMake target is `<pkg>::<pkg>` (Conan 2 default). Every build
+exports `compile_commands.json` to the project root so editors (clangd, VS Code) get
+completion and diagnostics without configuration — it is gitignored and removed by
+`carry clean`.
 
 ## How it works
 
@@ -117,9 +120,11 @@ rewrites them only if changed, then runs the pipeline: `conan install . --output
 Conan toolchain + CMakeDeps configs into `build/`), `cmake -S . -B build -G Ninja` with the
 Conan toolchain file, and `cmake --build build`. The `compiler.cppstd` override keeps the
 Conan graph resolved with the C++ standard the project actually compiles with (e.g. a
-dependency requiring C++23 works even if your Conan profile still says gnu20). Build output
-streams straight to the terminal; a tool failure reports the tool, its exit code, and the
-exact command line.
+dependency requiring C++23 works even if your Conan profile still says gnu20). After
+configure, the compile database (`build/compile_commands.json`) is copied to the project
+root (only when changed), so clangd and VS Code work out of the box. Build output streams
+straight to the terminal; a tool failure reports the tool, its exit code, and the exact
+command line.
 
 ## For AI contributors
 

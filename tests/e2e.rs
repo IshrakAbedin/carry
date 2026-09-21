@@ -63,9 +63,11 @@ fn new_scaffold_layout() {
 
     // I001: conan drops CMakeUserPresets.json in the project root on every
     // build — the scaffold .gitignore must cover it (and the build dir).
+    // D13: carry's root compile_commands.json export is also a build artifact.
     let gitignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
     assert!(gitignore.contains("build/"), "{gitignore}");
     assert!(gitignore.contains("CMakeUserPresets.json"), "{gitignore}");
+    assert!(gitignore.contains("compile_commands.json"), "{gitignore}");
 }
 
 /// `carry add`/`remove` through the real binary — hermetic: these edit
@@ -301,4 +303,45 @@ fn glaze_full_loop() {
     let (stdout, _) = carry_ok(&root, &["run"]);
     assert!(stdout.contains(r#""name":"Alice""#), "{stdout}");
     assert!(stdout.contains(r#""age":42"#), "{stdout}");
+}
+
+/// D13 (T010): `carry build` exports the compile database to the project
+/// **root** so editors (clangd, VS Code) find it without configuration; a
+/// no-change rebuild keeps its mtime stable (write-if-changed), and
+/// `carry clean` removes it. Needs the C++ toolchain, so `#[ignore]`d (D8).
+#[test]
+#[ignore = "needs C++ toolchain (D8)"]
+fn compile_commands_export() {
+    let dir = tempfile::tempdir().unwrap();
+    carry_ok(dir.path(), &["new", "ccapp", "--lib"]);
+    let root = dir.path().join("ccapp");
+
+    carry_ok(&root, &["build"]);
+    let cc = root.join("compile_commands.json");
+    assert!(cc.is_file(), "compile_commands.json must be at the project root");
+    let content = std::fs::read_to_string(&cc).unwrap();
+    // One command entry per scaffold source file (lib + bin + test targets).
+    // CMake/Ninja export absolute paths, so anchor on the project root.
+    for rel in ["src/main.cpp", "src/lib.cpp", "tests/test_main.cpp"] {
+        let expected = format!("{}/{}", root.display(), rel);
+        assert!(
+            content.contains(&format!("\"file\": \"{expected}\"")),
+            "missing {rel}:\n{content}"
+        );
+    }
+
+    // No-change rebuild: the root export must not be rewritten, so editor
+    // file-watchers are not triggered on no-op builds.
+    let mtime = std::fs::metadata(&cc).unwrap().modified().unwrap();
+    carry_ok(&root, &["build"]);
+    assert_eq!(
+        std::fs::metadata(&cc).unwrap().modified().unwrap(),
+        mtime,
+        "a no-change rebuild must not rewrite the root export"
+    );
+
+    // clean removes the export alongside build/ (a stale export pointing at
+    // a wiped build/ is worse than none).
+    carry_ok(&root, &["clean"]);
+    assert!(!cc.exists(), "carry clean must remove the root export");
 }

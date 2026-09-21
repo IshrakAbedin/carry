@@ -58,6 +58,9 @@ enum Commands {
         then: `conan install` (resolve dependencies) → `cmake` configure → `ninja` build.\n\n\
         Debug by default; `--release` builds Release. Build output lands in `build/`, \
         executables in `build/bin/<name>`.\n\n\
+        After configure, `compile_commands.json` is copied to the project root \
+        (write-if-changed) for editor integration — clangd and VS Code find it \
+        without extra configuration. `carry clean` removes it.\n\n\
         `--verbose` prints each external command before running it.")]
     Build {
         /// Build with the Release build type (default: Debug)

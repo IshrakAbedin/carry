@@ -6,6 +6,24 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T010: compile commands export for editors (D13)
+
+- **User-directed ad-hoc task (post-MVP):** make editors (clangd, VS Code) work on
+  carry projects with zero config — generate a `compile_commands.json`.
+- **→ D13** (DESIGN.md §2/§3/§6 + decision): configure gains
+  `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`; new `export_compile_commands()` in build.rs
+  copies `build/compile_commands.json` to the project **root** (where editors look by
+  default), write-if-changed so no-op rebuilds keep the mtime stable; placed before
+  `cmake --build` so a failing ninja still leaves a current command list. Copy, not
+  symlink; no new subcommand.
+- **`carry clean`** now removes the root export alongside `build/` (stale export >
+  none is worse than none); scaffold `.gitignore` += `compile_commands.json`; `Build`
+  help text updated.
+- Verification: hermetic `cargo test` 36 unit + 2 e2e green, clippy zero warnings;
+  `cargo test -- --ignored` → **compile_commands_export (new) + fmt + glaze all ok
+  (9.61s)**; scratch loop confirmed absolute `"file"` paths, `-std=gnu++23`, mtime
+  stability, clean output. One commit (T010).
+
 ## 2026-09-21 — T009: glaze demo + C++ standard sync (D12)
 
 - **User-directed ad-hoc task (post-MVP):** run a temporary demo project through carry

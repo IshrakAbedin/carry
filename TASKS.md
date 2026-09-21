@@ -16,6 +16,7 @@ result in `results/Txxx.md`. **Next task = first `pending` row in order.**
 | T007 | E2E hardening with a real Conan dependency (fmt) | done | results/T007.md |
 | T008 | Polish: README, help text, final verification | done | results/T008.md |
 | T009 | Demo build with glaze; C++ standard sync (D12) | done | results/T009.md |
+| T010 | Compile commands export (compile_commands.json, D13) | done | results/T010.md |
 
 Order: the MVP ran strictly sequential T001 → T008 (frozen at 0.1.0). From T009 on, tasks
 are user-directed/ad-hoc. Each task file lists its dependencies and what to read from

@@ -15,7 +15,9 @@ use crate::manifest::{self, Build, Manifest, Package};
 
 /// CMakeUserPresets.json: conan's CMakeToolchain writes it next to the
 /// conanfile/CMakeLists (project root) on every `conan install` (I001).
-pub const GITIGNORE: &str = "build/\nCMakeUserPresets.json\n";
+/// compile_commands.json: carry's editor-facing compile database, copied to
+/// the project root on every build (D13).
+pub const GITIGNORE: &str = "build/\nCMakeUserPresets.json\ncompile_commands.json\n";
 
 /// main.cpp for type "bin" (no library to call).
 pub const MAIN_CPP_BIN: &str = "\
