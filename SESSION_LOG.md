@@ -6,6 +6,26 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — Fix-issue session: I001 (CMakeUserPresets.json un-ignored)
+
+- **I001 fixed at root cause** (user-directed: fix open issues only, T008 polish deferred).
+  Reproduced exactly as filed (scratch `carry new demo` + git init/commit →
+  `carry build` → `git status` shows `?? CMakeUserPresets.json` at root; no
+  other strays exist — no `.bak`-style files in carry's code). Fix: `GITIGNORE`
+  in `src/template.rs` is now `build/\nCMakeUserPresets.json\n` (scaffold-domain
+  fix per the issue's own notes; conan's root-write behavior is untouched).
+  One-line comment update in DESIGN.md §3 layout (recorded here per the
+  no-silent-DESIGN-rules).
+- Regression tests: hermetic `new_scaffold_layout` now asserts the scaffold
+  `.gitignore` contains `build/` + `CMakeUserPresets.json`; `#[ignore]`d
+  `fmt_full_loop` asserts after its real build that the stray exists at root
+  **and** is covered by the scaffold `.gitignore`.
+- Verification: repro re-run post-fix — same commands, `git status` after
+  build is clean. `cargo build`/`clippy --all-targets` zero warnings,
+  `cargo test` 29 unit + 2 e2e pass, `--ignored` `fmt_full_loop` **5.01s**
+  (warm). Scratch removed. No new issues. Next: T008 (polish only — I001 no
+  longer in scope).
+
 ## 2026-09-21 — T007: E2E hardening with a real Conan dependency (fmt)
 
 - **MVP proven E2E:** fresh scratch `fmtapp --lib` using fmt in lib+bin+test:

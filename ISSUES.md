@@ -19,7 +19,7 @@ Rules:
 ---
 
 ## I001 — conan's CMakeUserPresets.json lands in project root, un-ignored
-Status: open
+Status: fixed (by fix-issue session 2026-09-21; `GITIGNORE` in src/template.rs now includes `CMakeUserPresets.json`, regression-tested in tests/e2e.rs)
 Found: T004 (2026-09-21)
 Symptom: After the first `carry build`, conan's CMakeToolchain writes
 `CMakeUserPresets.json` into the project **root** (alongside CARRY.toml). The

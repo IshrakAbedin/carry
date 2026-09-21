@@ -60,6 +60,12 @@ fn new_scaffold_layout() {
     let manifest = std::fs::read_to_string(root.join("CARRY.toml")).unwrap();
     assert!(manifest.contains("name = \"fmtapp\""), "{manifest}");
     assert!(manifest.contains("type = \"both\""), "{manifest}");
+
+    // I001: conan drops CMakeUserPresets.json in the project root on every
+    // build — the scaffold .gitignore must cover it (and the build dir).
+    let gitignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
+    assert!(gitignore.contains("build/"), "{gitignore}");
+    assert!(gitignore.contains("CMakeUserPresets.json"), "{gitignore}");
 }
 
 /// `carry add`/`remove` through the real binary — hermetic: these edit
@@ -201,6 +207,13 @@ fn fmt_full_loop() {
     }
 
     carry_ok(&root, &["build"]);
+
+    // I001 regression: conan writes CMakeUserPresets.json into the project
+    // root; the scaffold .gitignore must cover it so a git-managed project
+    // stays clean.
+    assert!(root.join("CMakeUserPresets.json").is_file());
+    let gitignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
+    assert!(gitignore.contains("CMakeUserPresets.json"), "{gitignore}");
 
     let (stdout, _) = carry_ok(&root, &["run"]);
     assert!(stdout.contains("Hello from fmtapp!"), "{stdout}");

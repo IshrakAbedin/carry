@@ -13,7 +13,9 @@ use anyhow::{bail, Context, Result};
 
 use crate::manifest::{self, Build, Manifest, Package};
 
-pub const GITIGNORE: &str = "build/\n";
+/// CMakeUserPresets.json: conan's CMakeToolchain writes it next to the
+/// conanfile/CMakeLists (project root) on every `conan install` (I001).
+pub const GITIGNORE: &str = "build/\nCMakeUserPresets.json\n";
 
 /// main.cpp for type "bin" (no library to call).
 pub const MAIN_CPP_BIN: &str = "\
