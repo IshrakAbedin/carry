@@ -13,7 +13,7 @@ result in `results/Txxx.md`. **Next task = first `pending` row in order.**
 | T004 | Build pipeline: conan → cmake → ninja (`carry build`) | done | results/T004.md |
 | T005 | `carry run`, `carry test` (ctest), `carry clean` | done | results/T005.md |
 | T006 | `carry add` / `carry remove` (toml_edit, format-preserving) | done | results/T006.md |
-| T007 | E2E hardening with a real Conan dependency (fmt) | pending | — |
+| T007 | E2E hardening with a real Conan dependency (fmt) | done | results/T007.md |
 | T008 | Polish: README, help text, final verification | pending | — |
 
 Order: strictly sequential T001 → T008. Each task file lists its dependencies and what to

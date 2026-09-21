@@ -185,9 +185,14 @@ impl Manifest {
 /// Parse a dependency spec `pkg` or `pkg@version`, splitting on the **last**
 /// `@`, and validate the name with the manifest name rule. The version part
 /// may be plain (`10.2.1`) or a range (`>=10`); bare `pkg` stores an empty
-/// version (maps to `pkg/*` via `conan_ref`).
+/// version (maps to the "any" range via `conan_ref`). An `@` with an empty
+/// version after it is a typo and is rejected (T007).
 pub fn parse_dep_spec(spec: &str) -> Result<(String, String)> {
     let (name, version) = match spec.rsplit_once('@') {
+        Some((_, "")) => anyhow::bail!(
+            "missing version after '@' in \"{spec}\"\n\
+             help: use pkg@version, e.g. fmt@10.2.1 — or drop the '@' for any version"
+        ),
         Some((n, v)) => (n, v.to_string()),
         None => (spec, String::new()),
     };
@@ -289,11 +294,14 @@ pub fn validate_name(name: &str) -> Result<()> {
 
 /// Map a manifest dependency value to a Conan reference (DESIGN.md §4):
 /// plain version → `pkg/ver`, range (`>` `<` `=` `^` `~` prefix) → `pkg/[range]`,
-/// empty → `pkg/*`.
+/// empty → `pkg/[>=0]`. A bare `pkg/*` is *not* a valid require in Conan 2
+/// (2.32.0 rejects it as unresolvable even when matching versions are
+/// cached), so "any version" uses the `[>=0]` range — the highest available
+/// version, cache preferred (D11, T007).
 pub fn conan_ref(pkg: &str, version: &str) -> String {
     match version.chars().next() {
         Some('>' | '<' | '=' | '^' | '~') => format!("{pkg}/[{version}]"),
-        None => format!("{pkg}/*"),
+        None => format!("{pkg}/[>=0]"),
         _ => format!("{pkg}/{version}"),
     }
 }
@@ -484,6 +492,10 @@ c_std   = \"c11\"
         );
         // Split on the LAST '@': a '@' in the name part → invalid name.
         assert!(parse_dep_spec("a@b@c").is_err());
+        // A trailing '@' is a typo, not "any version" (T007).
+        let err = parse_dep_spec("fmt@").unwrap_err().to_string();
+        assert!(err.contains("missing version after '@'"), "{err}");
+        assert!(err.contains("help:"), "{err}");
         for bad in ["Bad-Pkg", "-x", "", "bad name", "bad/name", "böhm"] {
             let err = parse_dep_spec(bad).unwrap_err().to_string();
             assert!(
@@ -627,6 +639,7 @@ c_std   = \"c11\"
         assert_eq!(conan_ref("z", "=1.2.3"), "z/[=1.2.3]");
         assert_eq!(conan_ref("z", "^1"), "z/[^1]");
         assert_eq!(conan_ref("z", "~1.2"), "z/[~1.2]");
-        assert_eq!(conan_ref("fmt", ""), "fmt/*");
+        // Bare pkg → "any" range (a bare `fmt/*` is not a valid require, D11).
+        assert_eq!(conan_ref("fmt", ""), "fmt/[>=0]");
     }
 }

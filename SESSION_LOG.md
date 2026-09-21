@@ -6,6 +6,26 @@ Keep each entry to ~10 lines max; deep detail belongs in `results/`.
 
 ---
 
+## 2026-09-21 — T007: E2E hardening with a real Conan dependency (fmt)
+
+- **MVP proven E2E:** fresh scratch `fmtapp --lib` using fmt in lib+bin+test:
+  add fmt@10.2.1 → build Debug → run prints `answer: 42` → build --release
+  (CMakeCache Release) → test `100% tests passed` → remove fmt + revert →
+  build green, conanfile without fmt. Network probe: works (range resolution
+  0.26s warm; conancenter lists fmt ≤ 12.2.0).
+- **3 bugs found, all fixed (D10, D11 in DESIGN.md):** B1 generated lib had no
+  dep includes/links → system-fmt header hijack, link failure on
+  `fmt::v12`/`v10` inline-namespace mismatch → lib now links deps PUBLIC;
+  B2 `add fmt@` (trailing @) silently meant "any" → now error + `help:`;
+  B3 bare `pkg` → `pkg/*` is **not resolvable by Conan 2.32 as a require**
+  (even with the version cached) → now `pkg/[>=0]`.
+- **tests/e2e.rs** (new): hermetic `new_scaffold_layout` +
+  `add_remove_round_trip` (incl. trailing-@ guard) in the default suite;
+  `fmt_full_loop` `#[ignore]`d (D8) = the whole manual loop as code.
+- Verification: 29 unit + 2 e2e pass, clippy clean, `--ignored` loop **5.38s**
+  (warm). Scratch dirs removed. No new issues; I001 re-reproduced, stays open.
+  Next: T008 (polish: README/help, I001 `.gitignore` fix, final verification).
+
 ## 2026-09-21 — T006: carry add / carry remove (format-preserving)
 
 - `manifest.rs`: `parse_dep_spec` (split on **last** `@`, name rule via new

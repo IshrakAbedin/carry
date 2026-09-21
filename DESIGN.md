@@ -85,7 +85,8 @@ fmt = "10.2.1"         # pkg = version ("10.2.1") or range (">=10")
 Version mapping to Conan refs:
 - plain version `10.2.1` → `fmt/10.2.1`
 - range `>=10` → `fmt/[>=10]`
-- bare `fmt` (no version) → `fmt/*`
+- bare `fmt` (no version) → `fmt/[>=0]` — "any version"; a bare `fmt/*` is
+  **not** a resolvable require in Conan 2 (D11)
 
 ## 5. Generated files
 
@@ -115,6 +116,7 @@ find_package(fmt REQUIRED)          # one per dependency
 
 add_library(demo_lib STATIC src/lib.cpp)     # only if lib
 target_include_directories(demo_lib PUBLIC include)
+target_link_libraries(demo_lib PUBLIC fmt::fmt)   # deps PUBLIC (D10)
 
 add_executable(demo src/main.cpp)            # only if bin
 target_link_libraries(demo PRIVATE demo_lib fmt::fmt)   # lib first, then deps
@@ -225,3 +227,22 @@ no Conan profile management (use the `default` profile).
   configure: CMake 4 rejects linking an EXECUTABLE target into another target, and
   even with `ENABLE_EXPORTS` it would duplicate `main` (exe's `src/main.cpp` vs the
   test's `test_main.cpp`). The §5 example line was updated accordingly.
+- **D10 (2026-09-21)** — The generated **library** target links the project's
+  dependencies as **PUBLIC**. T007 found that without this, a `#include <fmt/format.h>`
+  in `src/lib.cpp` silently resolves to the *system* fmt headers (when one is
+  installed) while the link line uses Conan's `libfmt.a` — a compile that "works"
+  but fails at link time on mismatched inline-namespace symbols (`fmt::v12` vs
+  `fmt::v10`). PUBLIC (rather than PRIVATE) is the safer default for a generated
+  library: consumers of `<name>_lib` get the dependency's includes and link
+  transitively. The exe/test keep their explicit dependency link lists (needed for
+  bin-only projects; harmless redundancy for `both`). The §5 example line was
+  updated accordingly.
+- **D11 (2026-09-21)** — A bare `pkg` (no version) maps to the range
+  `pkg/[>=0]`, **not** the literal `pkg/*` the §4 table originally specified.
+  T007 found Conan 2.32.0 rejects a bare `*` as a require: `conan install`
+  fails with "Package 'fmt/*' not resolved" even when `fmt/10.2.1` sits in the
+  local cache (the `*` is looked up literally, and the remote 404s it), while
+  `fmt/[>=0]` and `fmt/[>=10]` resolve fine (highest available version, cache
+  preferred). Related: `carry add fmt@` (trailing `@`, empty version) is
+  rejected with a `help:` hint — the `@` promises a version; dropping it is
+  how you ask for "any".
