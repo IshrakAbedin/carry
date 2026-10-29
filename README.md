@@ -5,6 +5,16 @@ manifest (`CARRY.toml`) give you deterministic `build` / `run` / `test` for a C/
 Under the hood it drives **CMake** (configure), **Conan 2** (dependencies), **Ninja** (build),
 and **g++** — you never touch the generated `CMakeLists.txt` or `conanfile.txt`.
 
+> _This repository is not intended for any practical use and exists only for archival purpose.
+It serves as a personal experiment to document what I can build with a local deployment of
+[Qwen3.8-27B-FP8](https://huggingface.co/Qwen/Qwen3.8-27B-FP8) (running on a 48GB RTX 6000 Ada
+Generation GPU) with a very limited context window of ~120k. The whole project was orchestrated
+using [Qwen Code](https://qwen.ai/qwencode) CLI. If you are interested in checking out exactly
+how the prompts were given, then explore the contents within the [session-history](session-history/)
+folder._
+
+## Status
+
 > **Status: MVP (v0.1.0).** All nine commands below are implemented and verified end to end
 > against a real Conan Center dependency (`fmt`) in Debug and Release. Known limitations:
 > GCC-only (compilers are pinned to `gcc`/`g++`), the `default` Conan profile only, no
